@@ -1,7 +1,7 @@
 import uuid
 import pullgerSquirrel as squirrel
 # from pullgerSquirrel import exceptions as exceptationsPullgerSquirrel
-from pullgerMultisessionManager_1 import exceptions
+from pullgerMultisessionManager import exceptions
 
 LOGGER_NAME = "pullger.MultisessionManager.generator"
 

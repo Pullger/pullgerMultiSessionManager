@@ -1,7 +1,6 @@
 import os
 from django.apps import AppConfig
-from pullgerMultisessionManager_1 import core
-
+from pullgerMultisessionManager import core
 
 class MultisessionManagerCoreConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
