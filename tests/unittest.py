@@ -1,6 +1,6 @@
 from django.test import TestCase
 from django.apps import apps
-from pullgerMultisessionManager_1 import api, core
+from pullgerMultisessionManager import api, core
 
 
 class Test_000_API(TestCase):
