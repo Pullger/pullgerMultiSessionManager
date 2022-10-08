@@ -1,0 +1,18 @@
+Version history
+
+{0.1.2.0} [pullgerMultiSessionManager]
+ - Transfer exceptions to external library
+ - Bring the code to PEP8 standard
+
+{0.1.1.0} [pullgerMultiSessionManager]
+ - Changed module name to MultiSessionManager
+
+{0.1.0.0} [pullgerMultiSessionManager]
+ - add functionality session type of connectors
+
+{0.0.3.0} [pullgerMultiSessionManager]
+ - add version control
+ - fix import module in unit test
+
+{0.0.2.0} [pullgerMultiSessionManager]
+ - initialization
