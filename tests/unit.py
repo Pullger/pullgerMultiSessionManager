@@ -1,45 +1,44 @@
 from django.test import TestCase
 from django.apps import apps
-from pullgerMultisessionManager import api, core
+from pullgerMultiSessionManager import api, core
+from . import UnitOperations
 
+class Test_000_00_00_API(TestCase):
+    def test_001_00_00_SessionManager_smoke(self):
+        def create_and_kill_standard_sessions():
+            session_uuid = UnitOperations.add_new_session_general_no_head()
 
-class Test_000_API(TestCase):
-    def test_001_SessionManager_smoke(self):
-        def createAndKillStandardSessions():
-            sessionUUID = api.addNewSession()
-            self.assertNotEqual(sessionUUID, None, 'Error on creating new session')
-            resultKillSession = api.killSession(uuid=sessionUUID)
-            self.assertEqual(resultKillSession, None, 'Error on killing empy session')
-        def createAndKillAuthorizationLinkedINSessions():
-            sessionUUID = api.addNewSession(authorizationRootServerName='linkedin')
-            self.assertNotEqual(sessionUUID, None, 'Error on creating new session')
-            resultKillSession = api.killSession(uuid=sessionUUID)
+            resultKillSession = api.kill_session(uuid=session_uuid)
             self.assertEqual(resultKillSession, None, 'Error on killing empy session')
 
-        createAndKillStandardSessions();
-        createAndKillAuthorizationLinkedINSessions()
+        def create_and_kill_authorization_linkedin_sessions():
+            uuid_session = UnitOperations.add_new_linkedin_session()
+            UnitOperations.kill_session(uuid_session)
 
-    def test_000_SessionManager_getSessionList(self):
+        create_and_kill_standard_sessions()
+        create_and_kill_authorization_linkedin_sessions()
+
+    def test_000_00_00_SessionManager_getSessionList(self):
         testUUID = []
-        testUUID.append(api.addNewSession())
-        testUUID.append(api.addNewSession())
-        sessionList = api.getSessionsList()
+        testUUID.append(api.add_new_session())
+        testUUID.append(api.add_new_session())
+        sessionList = api.get_sessions_list()
 
         for index in range(0, 2):
             self.assertEqual(sessionList[index]['uuid'] , testUUID[index])
 
-class Test_001_Operation(TestCase):
-    def test_001_initiation(self):
+class Test_001_00_00_Operation(TestCase):
+    def test_001_00_00_initiation(self):
         '''
             Testing mechenisme initialisation
         '''
 
 
-        reglament_app = apps.get_app_config('pullgerMultisessionManager')
+        reglament_app = apps.get_app_config('pullgerMultiSessionManager')
         self.assertIsInstance(reglament_app.multisessionManager, core.ConnectionManager, " Incorrect creating on django APP")
 
-    def test_002_TaskStack(self):
-        reglament_app = apps.get_app_config('pullgerMultisessionManager')
+    def test_002_00_00_TaskStack(self):
+        reglament_app = apps.get_app_config('pullgerMultiSessionManager')
         multisessionManager = reglament_app.multisessionManager
 
         def smokeTest():
@@ -49,7 +48,7 @@ class Test_001_Operation(TestCase):
             def addTask():
 
                 global uuidTask1
-                uuidTask1 = multisessionManager.taskStack.addTask()
+                uuidTask1 = multisessionManager.taskStack.add_task()
                 self.assertIsInstance(uuidTask1, str, 'Incorrect retyrn type')
                 self.assertEqual(len(uuidTask1), 36, 'Incorrect retyrn type')
 
@@ -57,7 +56,7 @@ class Test_001_Operation(TestCase):
                 self.assertEqual(multisessionManager.taskStack._taskList[0]['uuid'], uuidTask1, "Incorrect task creating")
 
                 global uuidTask2
-                uuidTask2 = multisessionManager.taskStack.addTask()
+                uuidTask2 = multisessionManager.taskStack.add_task()
                 self.assertIsInstance(uuidTask2, str, 'Incorrect retyrn type')
                 self.assertEqual(len(uuidTask2), 36, 'Incorrect retyrn type')
 
@@ -88,7 +87,7 @@ class Test_001_Operation(TestCase):
                 'finisher': 'FTest1',
             }
 
-            uuidTask1 = multisessionManager.taskStack.addTask(**taskStructure1)
+            uuidTask1 = multisessionManager.taskStack.add_task(**taskStructure1)
             for curTSkey,  curTSValue in taskStructure1.items():
                 self.assertIn(curTSkey, multisessionManager.taskStack._taskList[0], "Property does't exist.")
                 self.assertEqual(multisessionManager.taskStack._taskList[0][curTSkey], curTSValue, 'Incorrect data translation.')
@@ -101,13 +100,13 @@ class Test_001_Operation(TestCase):
         smokeTest()
         internalIntegration()
 
-    def test_003_SessionManager(self):
-        reglament_app = apps.get_app_config('pullgerMultisessionManager')
-        multisessionManager = reglament_app.multisessionManager
+    def test_003_00_00_SessionManager(self):
+        msm_app = apps.get_app_config('pullgerMultiSessionManager')
+        multi_session_manager = msm_app.multi_session_manager
 
         def smokeTest():
-            sessionUUID = multisessionManager.sessionManager.addNewSession()
-            killResult =  multisessionManager.sessionManager.killSession(sessionUUID)
+            sessionUUID = multi_session_manager.sessionManager.add_new_session()
+            killResult = multi_session_manager.sessionManager.kill_session(sessionUUID)
             self.assertEqual(killResult, True, "Can't kill session after creation.")
 
         smokeTest()

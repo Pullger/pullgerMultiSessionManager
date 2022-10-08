@@ -1,1 +1,1 @@
-# pullgerMultisessionManager
+# pullgerMultiSessionManager
