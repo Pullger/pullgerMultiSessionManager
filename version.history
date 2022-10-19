@@ -1,4 +1,10 @@
-Version history
+Version history [pullgerMultiSessionManager]
+
+{0.2.0.0} [pullgerMultiSessionManager]
+ --CHANGE--/issues/2-- Functionality of finding html elements and performing operations of them.
+ - Bring some code to PEP8 standard
+ - Rebuilding SessionManager to class structure
+ - Migrate to pullgerInternalControl library from pullgerLogin and pullgerExceptions
 
 {0.1.2.0} [pullgerMultiSessionManager]
  - Transfer exceptions to external library

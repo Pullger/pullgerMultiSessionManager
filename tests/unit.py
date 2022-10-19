@@ -70,9 +70,9 @@ class Test_001_00_00_Operation(TestCase):
                 global uuidTask2
 
                 self.assertEqual(len(multisessionManager.taskStack._taskList), 2, "Incorrect start position")
-                multisessionManager.taskStack.deleteTask(uuidTask1)
+                multisessionManager.taskStack.delete_task(uuidTask1)
                 self.assertEqual(len(multisessionManager.taskStack._taskList), 1, "Incorrect delete task")
-                multisessionManager.taskStack.deleteTask(uuidTask2)
+                multisessionManager.taskStack.delete_task(uuidTask2)
                 self.assertEqual(len(multisessionManager.taskStack._taskList), 0, "Incorrect delete task")
 
             addTask()
@@ -91,7 +91,7 @@ class Test_001_00_00_Operation(TestCase):
             for curTSkey,  curTSValue in taskStructure1.items():
                 self.assertIn(curTSkey, multisessionManager.taskStack._taskList[0], "Property does't exist.")
                 self.assertEqual(multisessionManager.taskStack._taskList[0][curTSkey], curTSValue, 'Incorrect data translation.')
-            multisessionManager.taskStack.deleteTask(uuidTask1)
+            multisessionManager.taskStack.delete_task(uuidTask1)
 
         # def exceptations():
         #     multisessionManager.taskStack.deleteTask('sfsfsf')
