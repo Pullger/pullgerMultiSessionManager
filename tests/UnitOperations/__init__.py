@@ -23,3 +23,10 @@ def add_new_session_selenium_headless(self):
     self.assertNotEqual(session_uuid, None, 'Error on creating new session')
 
     return session_uuid
+
+
+def add_new_session_selenium_stand_alone(self):
+    session_uuid = api.add_new_session(conn=connector.stand_alone.general)
+    self.assertNotEqual(session_uuid, None, 'Error on creating new session')
+
+    return session_uuid
