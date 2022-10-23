@@ -302,7 +302,6 @@ class ConnectionManager:
                                 if cur_session.squirrel is not None:
                                     try:
                                         cur_session.squirrel.close()
-                                        cur_session.squirrel = None
                                         return True
                                     except BaseException as e:
                                         raise pIC_pMSM.SessionManagement.SqirrelOperation(
@@ -310,10 +309,11 @@ class ConnectionManager:
                                             level=50,
                                             exception=e
                                         )
+                                    finally:
+                                        cur_session.squirrel = None
                                 elif cur_session.domain is not None:
                                     try:
                                         cur_session.domain.close()
-                                        cur_session.domain = None
                                         return True
                                     except BaseException as e:
                                         raise pIC_pMSM.SessionManagement.DomainOperation(
@@ -321,9 +321,11 @@ class ConnectionManager:
                                             level=50,
                                             exception=e
                                         )
+                                    finally:
+                                        cur_session.domain = None
                         break
             except:
-                pass
+                return True
 
             return False
 
