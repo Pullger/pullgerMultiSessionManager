@@ -1,30 +1,52 @@
 import uuid
+import importlib
 
 import pullgerSquirrel
 from pullgerInternalControl import pIC_pMSM
 from pullgerInternalControl import pIC_pD
 
 
+def get_model_class_by_name(full_path):
+    path_list = full_path.split('.')
+    module_library = importlib.import_module('.'.join(path_list[:-1]))
+    return getattr(module_library, path_list[-1])
+
+    # import importlib
+    # task_forProcessing.model.split('.')
+
+    # path_list = task_forProcessing.model.split('.')
+    # mm = importlib.import_module(task_forProcessing.model)
+    # mm = importlib.import_module('.'.join(path_list[:-1]))
+    # pass
+
+
+def get_function_by_name(model_class, name):
+    return getattr(model_class, name)
+
+
 class ConnectionManager:
     __slots__ = (
-        'taskStack',
+        '_task_stack',
         'taskExecutingStack',
-        'taskFinishedStack',
+        '_task_finished_stack',
         'sessionManager',
         'operationExecutor'
     )
 
+    def __del_(self):
+        pass
+
     def __init__(self):
-        self.taskStack = self.TaskStackClass()
-        self.taskFinishedStack = self.TaskFinishedStack()
+        self._task_stack = self.TaskStackClass(connection_manager=self)
+        self._task_finished_stack = self.TaskFinishedStack()
         self.sessionManager = self.SessionManagerClass()
-        self.operationExecutor = self.OperationExecutorClass(cm=self)
+        self.operationExecutor = self.OperationExecutorClass(connection_manager=self)
 
     class OperationExecutorClass:
         __slots__ = '_connectionManager'
 
-        def __init__(self, cm, **kwargs):
-            self._connectionManager = cm
+        def __init__(self, connection_manager, **kwargs):
+            self._connectionManager = connection_manager
 
         def get_page(self, uuid_session: str, url: str, **kwargs):
             session = self._connectionManager.sessionManager.get_session_by_uuid(uuid_session=uuid_session)
@@ -101,23 +123,80 @@ class ConnectionManager:
                     level=30
                 )
 
-
-
     class TaskStackClass(object):
-        __slots__ = "_taskList"
+        __slots__ = ("_task_list", "_connection_manager")
 
-        def __init__(self):
-            self._taskList = []
+        def __init__(self, connection_manager):
+            self._task_list = []
+            self._connection_manager = connection_manager
 
-        @staticmethod
-        def __getStructure(**kwargs):
-            return {
-                'uuid': kwargs['uuid'] if 'uuid' in kwargs else None,
-                'execute_permission': kwargs['execute_permission'] if 'execute_permission' in kwargs else False,
-                'authorization': kwargs['authorization'] if 'authorization' in kwargs else None,
-                'loader': kwargs['loader'] if 'loader' in kwargs else None,
-                'finalizer': kwargs['finalizer'] if 'finalizer' in kwargs else None,
-            }
+        class MultiSessionTask:
+            __slots__ = (
+                'uuid_ms_task',
+                'uuid_sync_task',
+                'uuid_element',
+                'handle',
+                'table',
+                'model',
+                'execute_permission',
+                'authorization',
+                'connectors',
+                'status_code',
+                'status_description',
+                '_connection_manager'
+            )
+
+            def __del__(self):
+                pass
+
+            def __init__(
+                    self,
+                    uuid_sync_task: str = None,
+                    uuid_element: str = None,
+                    handle: str = None,
+                    model=None,
+                    authorization=None,
+                    connectors=None,
+                    connection_manager=None
+            ):
+                self.uuid_ms_task = uuid.uuid4()
+                self.uuid_element = uuid_element
+                self.uuid_sync_task = uuid_sync_task
+                self.handle = handle
+                self.model = model
+                self.execute_permission = False
+                self.authorization = authorization
+                self.connectors = connectors
+                self.status_code = None
+                self.status_description = ''
+                self._connection_manager = connection_manager
+
+            def _set_success(self):
+                self.status_code = 200
+                self.status_description = None
+
+            def _set_error(self, error_code: int, error_description: str):
+                self.status_code = error_code
+                self.status_description = error_description
+
+            def finalize(self):
+                from pullgerReflection.com_linkedin__TT.models import ExecutionStackLinks as SyncRegistrar
+
+                SyncRegistrar.finalize(
+                    uuid=self.uuid_sync_task,
+                    status_code=self.status_code,
+                    status_description=self.status_description
+                )
+
+                self._connection_manager._task_finished_stack._task_finished_list.remove(self)
+
+            def set_executed(self, error=None):
+                if error is None:
+                    self._set_success()
+                else:
+                    self._set_error(error_code=400, error_description=str(error))
+                self._connection_manager._task_finished_stack._task_finished_list.append(self)
+
 
         def add_task(self, **kwargs):
             newTaskStructure = self.__getStructure(
@@ -126,12 +205,12 @@ class ConnectionManager:
                 loader=kwargs['loader'] if 'loader' in kwargs else None,
                 finalizer=kwargs['taskFinalizer'] if 'taskFinalizer' in kwargs else None,
             )
-            self._taskList.append(newTaskStructure)
+            self._task_list.append(newTaskStructure)
             return newTaskStructure['uuid']
 
         @staticmethod
         def _setExecutePermissionToTask(task, newStatus):
-            task['execute_permission'] = newStatus
+            task.execute_permission = newStatus
 
         def delete_task(self, uuid_task: str = None):
             if uuid_task is not None \
@@ -139,9 +218,9 @@ class ConnectionManager:
                     and len(uuid_task) == 36:
 
                 found = False
-                for index, curTask in enumerate(self._taskList):
+                for index, curTask in enumerate(self._task_list):
                     if curTask['uuid'] == uuid_task:
-                        del self._taskList[index]
+                        del self._task_list[index]
                         found = True
                         break
 
@@ -162,7 +241,7 @@ class ConnectionManager:
                     and len(uuid_task) == 36:
 
                 found = False
-                for curTask in self._taskList:
+                for curTask in self._task_list:
                     if curTask['uuid'] == uuid_task:
                         self._setExecutePermissionToTask(curTask, True)
                         found = True
@@ -179,69 +258,26 @@ class ConnectionManager:
                     level=40
                 )
 
-        def get_next_operation(self):
-            if len(self._taskList) != 0:
-                return self._taskList.pop(0)
+        def get_next_task(self):
+            if len(self._task_list) != 0:
+                return self._task_list.pop(0)
             else:
                 return None
 
+        def add_task_in_list(self, task):
+            self._task_list.append(task)
+
     class SessionManagerClass(object):
-        __slots__ = '_sessionsList'
+        __slots__ = '_sessions_list'
 
         def __init__(self):
-            self._sessionsList = []
+            self._sessions_list = []
 
-        class SessionClass(object):
-            __slots__ = ('uuid_session', 'connector', 'squirrel', 'domain',
-                         'account', 'authorization', 'active', 'in_use',
-                         'initialized', 'ready', 'live')
+        def __del__(self):
+            pass
 
-            def __init__(self, uuid_session: str = None, connector=None, squirrel=None, domain=None,
-                         account=None, authorization=None, active: bool = True, in_use: bool = False,
-                         initialized: bool = False, ready: bool = False, live: bool = False):
-                self.uuid_session = uuid_session
-                self.connector = connector
-                self.squirrel = squirrel
-                self.domain = domain
-                self.account = account
-                self.authorization = authorization
-                self.active = active
-                self.in_use = in_use
-                self.initialized = initialized
-                self.ready = ready
-                self.live = live
-
-            @property
-            def structure(self):
-                return {
-                    'uuid': str(self.uuid_session),
-                    'uuid_session': str(self.uuid_session),
-                    'connector': self.connector,
-                    'authorization': self.authorization,
-                    'used_account': False if self.account is None else True,
-                    'active': self.active,
-                    'in_use': self.in_use,
-                    'ready': self.ready,
-                    'live': self.live,
-                }
-
-        # @staticmethod
-        # def session_structure(**kwargs):
-        #     return {
-        #         'uuid': str(kwargs['uuid']) if 'uuid' in kwargs else None,
-        #         'connector': kwargs['connector'] if 'connector' in kwargs else None,
-        #         'squirrel': kwargs['squirrel'] if 'squirrel' in kwargs else None,
-        #         'domain': kwargs['domain'] if 'domain' in kwargs else None,
-        #         'account': kwargs['account'] if 'account' in kwargs else None,
-        #         'authorization': kwargs['authorization'] if 'authorization' in kwargs else None,
-        #         'active': kwargs['active'] if 'active' in kwargs else True,  # Permission to use session
-        #         'inUse': kwargs['inUse'] if 'inUse' in kwargs else False,  # Flag using session
-        #         'initialized': kwargs['initialized'] if 'initialized' in kwargs else False,
-        #         'ready': kwargs['ready'] if 'ready' in kwargs else False,
-        #         'live': kwargs['live'] if 'live' in kwargs else False,
-        #     }
-
-        def operation_structure(self):
+        @staticmethod
+        def operation_structure():
             return {
                 'operation': None,
                 'executing': False,
@@ -249,7 +285,7 @@ class ConnectionManager:
 
         def get_session_list(self):
             listOfSessions = []
-            for cur_session in self._sessionsList:
+            for cur_session in self._sessions_list:
                 listOfSessions.append(cur_session.structure)
                 # {
                 #     'uuid': str(cur_session['uuid']),
@@ -265,7 +301,7 @@ class ConnectionManager:
             return listOfSessions
 
         def get_session_by_uuid(self, uuid_session: str):
-            for cur_session in self._sessionsList:
+            for cur_session in self._sessions_list:
                 if cur_session.uuid_session == uuid_session:
                     return cur_session
             return None
@@ -283,54 +319,83 @@ class ConnectionManager:
             self.delete_disabled_sessions()
 
         def deleteSessionFromList(self, uuid):
-            for cur_session in self._sessionsList:
+            for cur_session in self._sessions_list:
                 if cur_session.uuid_session == uuid:
                     if cur_session.active is False \
                             and cur_session.squirrel is None \
                             and cur_session.in_use is False:
-                        del self._sessionsList[self._sessionsList.index(cur_session)]
+                        del self._sessions_list[self._sessions_list.index(cur_session)]
                         return True
                     break
             return False
 
-        def close_disabled_session(self, uuid_session):
-            try:
-                for cur_session in self._sessionsList:
-                    if cur_session.uuid_session == uuid_session:
-                        if cur_session.active is False:
-                            if cur_session.in_use is False:
-                                if cur_session.squirrel is not None:
-                                    try:
-                                        cur_session.squirrel.close()
-                                        return True
-                                    except BaseException as e:
-                                        raise pIC_pMSM.SessionManagement.SqirrelOperation(
-                                            'Error on closing session',
-                                            level=50,
-                                            exception=e
-                                        )
-                                    finally:
-                                        cur_session.squirrel = None
-                                elif cur_session.domain is not None:
-                                    try:
-                                        cur_session.domain.close()
-                                        return True
-                                    except BaseException as e:
-                                        raise pIC_pMSM.SessionManagement.DomainOperation(
-                                            'Error on closing domain',
-                                            level=50,
-                                            exception=e
-                                        )
-                                    finally:
-                                        cur_session.domain = None
-                        break
-            except:
-                return True
+        @staticmethod
+        def close_disabled_session(session):
+            if session.active is False:
+                if session.in_use is False:
+                    if session.squirrel is not None:
+                        try:
+                            session.squirrel.close()
+                            return True
+                        except BaseException as e:
+                            raise pIC_pMSM.SessionManagement.SqirrelOperation(
+                                'Error on closing session',
+                                level=50,
+                                exception=e
+                            )
+                        finally:
+                            session.squirrel = None
+                    elif session.domain is not None:
+                        try:
+                            session.domain.close()
+                            return True
+                        except BaseException as e:
+                            raise pIC_pMSM.SessionManagement.DomainOperation(
+                                'Error on closing domain',
+                                level=50,
+                                exception=e
+                            )
+                        finally:
+                            session.domain = None
+            return True
 
-            return False
+            # try:
+            #     for cur_session in self._sessions_list:
+            #         if cur_session.uuid_session == uuid_session:
+            #             if cur_session.active is False:
+            #                 if cur_session.in_use is False:
+            #                     if cur_session.squirrel is not None:
+            #                         try:
+            #                             cur_session.squirrel.close()
+            #                             return True
+            #                         except BaseException as e:
+            #                             raise pIC_pMSM.SessionManagement.SqirrelOperation(
+            #                                 'Error on closing session',
+            #                                 level=50,
+            #                                 exception=e
+            #                             )
+            #                         finally:
+            #                             cur_session.squirrel = None
+            #                     elif cur_session.domain is not None:
+            #                         try:
+            #                             cur_session.domain.close()
+            #                             return True
+            #                         except BaseException as e:
+            #                             raise pIC_pMSM.SessionManagement.DomainOperation(
+            #                                 'Error on closing domain',
+            #                                 level=50,
+            #                                 exception=e
+            #                             )
+            #                         finally:
+            #                             cur_session.domain = None
+            #             break
+            # except:
+            #     return True
+            #
+            # return False
 
         def close_disabled_sessions(self):
-            for cur_session in self._sessionsList:
+            for cur_session in self._sessions_list:
                 self.close_disabled_session(cur_session.uuid_session)
 
         def delete_disabled_sessions(self):
@@ -339,85 +404,47 @@ class ConnectionManager:
             """
 
             sessionForDelete = []
-            for cur_session in self._sessionsList:
+            for cur_session in self._sessions_list:
                 sessionForDelete.append()
 
             for cur_session_for_delete in sessionForDelete:
                 self._deleteSessionFromList(cur_session_for_delete)
 
         def disable_all_sessions(self):
-            for cur_session in self._sessionsList:
+            for cur_session in self._sessions_list:
                 self.disable_session(cur_session.uuid_session)
 
-        def disable_session(self, uuid_session: str):
-            for cur_session in self._sessionsList:
-                if cur_session.uuid_session == uuid_session:
-                    cur_session.active = False
-                    return True
-            return False
+        @staticmethod
+        def disable_session(session: str):
+            session.active = False
+            return True
 
-        def kill_session(self, uuid_session: str, **kwargs):
-            if self.disable_session(uuid_session):
-                if self.close_disabled_session(uuid_session):
-                    if self.deleteSessionFromList(uuid_session):
-                        return True;
+        def kill_session(self, uuid_session: str = None, session=None, **kwargs):
+            if uuid_session is not None:
+                session = self.get_session_by_uuid(uuid_session)
+
+            if self.disable_session(session):
+                if self.close_disabled_session(session):
+                    if self.deleteSessionFromList(str(session)):
+                        return True
             return False
 
         def add_new_session(self, authorization=None, conn=None, **kwargs):
             # =================================================================
-            squirrel = pullgerSquirrel.Squirrel(conn=conn)
-            squirrel.initialize()
-            if authorization is None:
-                try:
-                    uuid_session = str(uuid.uuid4())
-                    self._sessionsList.append(
-                        self.SessionClass(
-                            uuid_session=uuid_session,
-                            connector=conn,
-                            squirrel=squirrel,
-                            live=True,
-                            initialized=True,
-                        )
-                    )
-                    return uuid_session
-                except BaseException as e:
-                    raise pIC_pMSM.SessionManagement.ConnectionInitialization(
-                        msg="Critical error on initialisation. Internal description.",
-                        level=50,
-                        exception=e
-                    )
-            else:
-                domainClass = authorization.getDomain()
-                domain = domainClass(squirrel)
+            new_session = pullgerSquirrel.Session(conn=conn, authorization=authorization)
+            self._sessions_list.append(new_session)
 
-                if domain.initialized is True:
-                    uuid_session = str(uuid.uuid4())
-                    self._sessionsList.append(
-                        self.SessionClass(
-                            uuid_session=uuid_session,
-                            connector=conn,
-                            authorization=authorization,
-                            squirrel=squirrel,
-                            domain=domain,
-                            live=True
-                        )
-                    )
-                    return uuid_session
-                else:
-                    raise pIC_pMSM.SessionManagement.ConnectionInitialization(
-                        'Unexpected initialize domain status',
-                        level=50
-                    )
+            return new_session
 
-        def makeAllAutorization(self):
+        def make_all_authorization(self):
             from pullgerAccountManager.models import Accounts
-            from pullgerAccountManager import api as pAM__API
+            from pullgerAccountManager import apiAM
 
             allAccounts = list(Accounts.objects.getActualList())
 
             for curAccount in allAccounts:
                 accountUse = False
-                for cur_session in self._sessionsList:
+                for cur_session in self._sessions_list:
                     if cur_session.account == curAccount:
                         accountUse = True
                         break
@@ -425,12 +452,14 @@ class ConnectionManager:
                 if accountUse is True:
                     break
 
-                for cur_session in self._sessionsList:
+                for cur_session in self._sessions_list:
                     if cur_session.authorization is not None and cur_session.account is None:
                         try:
                             cur_session.account = curAccount
-                            cur_session.domain.authorization(cur_session.account.login,
-                                                             pAM__API.decripteMessage(cur_session.account.password))
+                            cur_session.domain.authorization(
+                                cur_session.account.login,
+                                apiAM.decrypt_message(cur_session.account.password)
+                            )
                             cur_session.ready = True
                         except BaseException as e:
                             cur_session.account = None
@@ -442,22 +471,24 @@ class ConnectionManager:
                                 exception=e
                             )
 
-        def get_free_session(self, authorization=None):
-            for cur_session in self._sessionsList:
-                if authorization is not None:
-                    if str(cur_session.authorization) != str(authorization):
-                        continue
+        def get_free_session(self, authorization=None, connectors=None):
+            for cur_session in self._sessions_list:
+                if str(cur_session.authorization) not in authorization:
+                    continue
+                if str(cur_session.connector) not in connectors:
+                    continue
+
                 if cur_session.active is not True \
                         and cur_session.in_use is not True \
                         and cur_session.live is not True:
                     continue
 
                 self.session_domain_put_in_use_true(cur_session.uuid_session)
-                return cur_session.uuid_session
+                return cur_session
             return None
 
         def session_domain_get(self, uuid_session):
-            for cur_session in self._sessionsList:
+            for cur_session in self._sessions_list:
                 if cur_session.uuid_session is uuid_session:
                     return cur_session.domain
 
@@ -467,7 +498,7 @@ class ConnectionManager:
             )
 
         def session_domain_put_in_use_true(self, uuid_session):
-            for findSession in self._sessionsList:
+            for findSession in self._sessions_list:
                 if findSession.uuid_session is uuid_session:
                     findSession.in_use = True
                     return
@@ -477,26 +508,23 @@ class ConnectionManager:
                 level=40
             )
 
-        def session_domain_set_in_use_false(self, uuid_session: str):
-            for findSession in self._sessionsList:
-                if findSession.uuid_session is uuid_session:
-                    findSession.in_use = False
-                    return
+        @staticmethod
+        def session_set_available(session: str):
+            session.in_use = False
 
-            raise pIC_pMSM.SessionManagement.General(
-                msg=f"Can't find session with UUID {uuid_session}",
-                level=40
-            )
-
-        def execute_operation_on_free_session(self, operation):
-            uuid_session = self.get_free_session(operation['authorization'])
-            if uuid_session is not None:
+        def execute_operation_on_free_session(self, multy_session_task):
+            session = self.get_free_session(multy_session_task.authorization, multy_session_task.connectors)
+            if session is not None:
                 try:
-                    operation['loader'].executeOnDomain(self.session_domain_get(uuid_session))
+                    model_class = get_model_class_by_name(multy_session_task.model)
+                    synced_elem = model_class.objects.get_by_uuid(uuid_element=multy_session_task.uuid_element)
+
+                    executor = get_function_by_name(synced_elem, multy_session_task.handle)
+                    executor(session=session)
 
                 except pIC_pD.General as e:
-                    raise pIC_pMSM.SessionManagement.Execute(
-                        msg=f"Error on executing task",
+                    raise pIC_pD.General(
+                        msg=f"Error loading domain: [{str(e)}]",
                         level=40,
                         exception=e
                     )
@@ -507,58 +535,59 @@ class ConnectionManager:
                         exception=e
                     )
                 finally:
-                    self.session_domain_set_in_use_false(uuid_session)
+                    self.session_set_available(session=session)
 
     class TaskFinishedStack(object):
-        __slots__ = '_taskFinishedStack'
+        __slots__ = '_task_finished_list'
 
         def __init__(self):
-            self._taskFinishedStack = []
+            self._task_finished_list = []
 
-        def finisherStructure(self, **kwargs):
-            return {
-                'uuid': str(kwargs['uuid']) if 'uuid' in kwargs else None,
-                'uuid_link': str(kwargs['uuid_link']) if 'uuid_link' in kwargs else None,
-                'finalizer': kwargs['finalizer'] if 'finalizer' in kwargs else None,
-                'status_code': kwargs['status_code'] if 'status_code' in kwargs else 200,
-                'status_discription': kwargs['status_discription'] if 'status_discription' in kwargs else None,
-            }
-
-        def add_error_operation(self, operation, error):
-            sentStructure = operation.copy()
-            sentStructure['status_code'] = 400
-            sentStructure['status_discription'] = str(error)
-
-            self._taskFinishedStack.append(self.finisherStructure(**sentStructure))
-
-        def add_finish_operation(self, operation):
-            self._taskFinishedStack.append(self.finisherStructure(**operation))
+        def __del__(self):
+            pass
 
     def task_execute(self):
-        returnStatus = False
-        operation = self.taskStack.get_next_operation()
-        if operation is not None:
-            try:
-                self.sessionManager.execute_operation_on_free_session(operation)
-                self.taskFinishedStack.add_finish_operation(operation)
-                returnStatus = True
-            except BaseException as e:
-                self.taskFinishedStack.add_error_operation(operation, e)
-        return returnStatus
+        return_status = None
+        task = self._task_stack.get_next_task()
+        try:
+            if task is not None:
+                self.sessionManager.execute_operation_on_free_session(task)
+                task.set_executed()
+                return_status = True
+        except BaseException as e:
+            task.set_executed(error=e)
+            return_status = False
+        return return_status
 
     def tasks_finalize(self):
         is_end = False
         indexList = 0
         while is_end is False:
-            if len(self.taskFinishedStack._taskFinishedStack) - 1 >= indexList:
-                curFinTask = self.taskFinishedStack._taskFinishedStack[indexList]
+            if len(self._task_finished_stack._task_finished_list) - 1 >= indexList:
+                cur_finalize_task = self._task_finished_stack._task_finished_list[indexList]
                 try:
                     try:
-                        self.taskFinishedStack._taskFinishedStack.remove(curFinTask)
-                        curFinTask['finalizer']()
+                        cur_finalize_task.finalize()
                     except BaseException as e:
                         raise pIC_pMSM.TaskFinalization.General('Error on finalisation', level=50, exeptation=e)
                 except:
                     indexList += 1
             else:
                 is_end = True
+
+    def add_sync_task(self, task_for_processing, **kwargs):
+        model_class = get_model_class_by_name(task_for_processing.model)
+
+        new_multy_session_task = self._task_stack.MultiSessionTask(
+            uuid_sync_task=task_for_processing.uuid,
+            uuid_element=task_for_processing.uuid_link,
+            handle='sync',
+            model=task_for_processing.model,
+            authorization=model_class.domain.required_authorization_servers_options(),
+            connectors=model_class.domain.required_connector_options(),
+            connection_manager=self
+        )
+
+        self._task_stack.add_task_in_list(new_multy_session_task)
+        task_for_processing.set_sent()
+        return new_multy_session_task

@@ -1,10 +1,9 @@
 from django.test import TestCase
-from django.apps import apps
-from pullgerMultiSessionManager import api, core
-from pullgerMultiSessionManager.tests import UnitOperations
+from pullgerMultiSessionManager import apiMSM
+from pullgerMultiSessionManager.tests.tools import UnitOperations
 
 
-class Unit_001_OperationElements(TestCase):
+class Unit001OperationElements(TestCase):
     def test_001_00_00_get_page(self):
 
         for i in range(2):

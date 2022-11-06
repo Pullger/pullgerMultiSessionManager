@@ -1,15 +1,13 @@
 from django.test import TestCase
-from django.apps import apps
-from pullgerMultiSessionManager import api, core
-from pullgerMultiSessionManager.tests import UnitOperations
+from pullgerMultiSessionManager import apiMSM
+from pullgerMultiSessionManager.tests.tools import UnitOperations
 import time
 
 
-class Unit_001_OperationExecution(TestCase):
+class Unit001OperationExecution(TestCase):
     # def test_001_00_00_screenshot(self):
     #     uuid_session = UnitOperations.add_new_session_selenium_headless(self)
     #     api.operation_get_page(uuid_session=uuid_session, url="https://linkedin.com")
-
 
     def test_001_00_00_get_page(self):
 

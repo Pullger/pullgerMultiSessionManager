@@ -1,3 +1,4 @@
+import uuid
 from django.apps import apps
 from pullgerInternalControl.pullgerMultiSessionManager.API import exceptions
 
@@ -13,9 +14,14 @@ def add_task(**kwargs):
             msm_app.multi_session_manager.taskStack.delete_task(uuid_task)
 
 
+def add_sync_task(task_for_processing):
+    msm_app = apps.get_app_config('pullgerMultiSessionManager')
+    return msm_app.multi_session_manager.add_sync_task(task_for_processing)
+
+
 def execute_task_in_the_queue():
     msm_app = apps.get_app_config('pullgerMultiSessionManager')
-    msm_app.multi_session_manager.task_execute()
+    return msm_app.multi_session_manager.task_execute()
 
 
 def execute_finalizer():
@@ -27,9 +33,9 @@ def add_new_session(authorization=None, conn=None, **kwargs):
     """
     Creating new operation session
 
+    :param authorization: CLASS of subclass pullgerAccountManager.authorizationsServers : authorization server
+    :param conn:
     :param kwargs:
-        authorization: CLASS of subclass pullgerAccountManager.authorizationsServers : authorization server
-        authorizationRootServerName: STRING: name of root authorization server
     :return:
     """
     from pullgerAccountManager import authorizationsServers
@@ -43,7 +49,7 @@ def add_new_session(authorization=None, conn=None, **kwargs):
     }
 
     if conn is not None:
-        if type(conn) == str:
+        if isinstance(conn, str):
             sessionParams['conn'] = connectors.get_by_name(conn)
         else:
             sessionParams['conn'] = conn
@@ -54,17 +60,19 @@ def add_new_session(authorization=None, conn=None, **kwargs):
         else:
             sessionParams['authorization'] = authorization
 
-    uuidSession = msm_app.multi_session_manager.sessionManager.add_new_session(**sessionParams)
-    return uuidSession
+    return msm_app.multi_session_manager.sessionManager.add_new_session(**sessionParams)
 
 
-def kill_session(uuid=None, **kwargs):
+def kill_session(uuid_session=None, session=None, **kwargs):
     msm_app = apps.get_app_config('pullgerMultiSessionManager')
-    if uuid is not None:
-        result = msm_app.multi_session_manager.sessionManager.kill_session(uuid_session=uuid)
+
+    if uuid_session is not None or session is not None:
+        return msm_app.multi_session_manager.sessionManager.kill_session(uuid_session=uuid_session, session=session)
     else:
-        result = False
-    return result
+        exceptions.General(
+            msg="Incorrect send data",
+            level=40
+        )
 
 
 def get_sessions_list():
@@ -79,7 +87,7 @@ def get_session_by_uuid(uuid_session):
 
 def make_all_session_authorization():
     msm_app = apps.get_app_config('pullgerMultiSessionManager')
-    msm_app.multi_session_manager.sessionManager.makeAllAutorization()
+    msm_app.multi_session_manager.sessionManager.make_all_authorization()
 
 
 def operation_get_page(uuid_session: str = None, url: str = None, **kwargs):

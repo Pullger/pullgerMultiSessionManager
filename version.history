@@ -1,5 +1,12 @@
 Version history [pullgerMultiSessionManager]
 
+{0.3.0.0} [pullgerMultiSessionManager]
+ - move session class to pullgerSquirrel module
+ - Brought some code to PEP8 standard
+
+{0.2.1.0} [pullgerMultiSessionManager]
+ - Some refactoring in tests
+
 {0.2.0.0} [pullgerMultiSessionManager]
  --CHANGE--/issues/2-- Functionality of finding html elements and performing operations of them.
  - Bring some code to PEP8 standard
