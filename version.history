@@ -1,5 +1,16 @@
 Version history [pullgerMultiSessionManager]
 
+{0.3.1.0} [pullgerMultiSessionManager]
+ - clear sent and not executed task
+ - set one rune module on start project
+ - brought some code to PEP8 standard
+
+{0.3.0.1} [pullgerMultiSessionManager]
+ - fix bug on executing task in queue
+ - fix bug on get get free session
+ - fix bug on delete deactivated session
+ - Brought some code to PEP8 standard
+
 {0.3.0.0} [pullgerMultiSessionManager]
  - move session class to pullgerSquirrel module
  - Brought some code to PEP8 standard

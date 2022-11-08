@@ -19,12 +19,12 @@ def add_sync_task(task_for_processing):
     return msm_app.multi_session_manager.add_sync_task(task_for_processing)
 
 
-def execute_task_in_the_queue():
+def execute_task_in_the_queue(*args, **kwargs):
     msm_app = apps.get_app_config('pullgerMultiSessionManager')
-    return msm_app.multi_session_manager.task_execute()
+    return msm_app.multi_session_manager.task_execute(*args, **kwargs)
 
 
-def execute_finalizer():
+def execute_finalizer(*args, **kwargs):
     msm_app = apps.get_app_config('pullgerMultiSessionManager')
     msm_app.multi_session_manager.tasks_finalize()
 
@@ -43,24 +43,24 @@ def add_new_session(authorization=None, conn=None, **kwargs):
 
     msm_app = apps.get_app_config('pullgerMultiSessionManager')
 
-    sessionParams = {
+    session_params = {
         'authorization': None,
         'conn': None
     }
 
     if conn is not None:
         if isinstance(conn, str):
-            sessionParams['conn'] = connectors.get_by_name(conn)
+            session_params['conn'] = connectors.get_by_name(conn)
         else:
-            sessionParams['conn'] = conn
+            session_params['conn'] = conn
 
     if authorization is not None:
         if type(authorization) == str:
-            sessionParams['authorization'] = authorizationsServers.getByName(authorization)
+            session_params['authorization'] = authorizationsServers.getByName(authorization)
         else:
-            sessionParams['authorization'] = authorization
+            session_params['authorization'] = authorization
 
-    return msm_app.multi_session_manager.sessionManager.add_new_session(**sessionParams)
+    return msm_app.multi_session_manager.sessionManager.add_new_session(**session_params)
 
 
 def kill_session(uuid_session=None, session=None, **kwargs):

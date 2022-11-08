@@ -9,6 +9,5 @@ class MultiSessionManagerCoreConfig(AppConfig):
     multi_session_manager = None
 
     def ready(self):
-        self.multi_session_manager = core.ConnectionManager()
         if os.environ.get('RUN_MAIN') == 'true':
-            pass
+            self.multi_session_manager = core.ConnectionManager()

@@ -1,4 +1,4 @@
-import uuid
+import uuid as uuid_class
 import importlib
 
 import pullgerSquirrel
@@ -27,7 +27,6 @@ def get_function_by_name(model_class, name):
 class ConnectionManager:
     __slots__ = (
         '_task_stack',
-        'taskExecutingStack',
         '_task_finished_stack',
         'sessionManager',
         'operationExecutor'
@@ -41,6 +40,8 @@ class ConnectionManager:
         self._task_finished_stack = self.TaskFinishedStack()
         self.sessionManager = self.SessionManagerClass()
         self.operationExecutor = self.OperationExecutorClass(connection_manager=self)
+        from pullgerReflection.com_linkedin__TT import models
+        models.ExecutionStackLinks.objects.initialization_clear()
 
     class OperationExecutorClass:
         __slots__ = '_connectionManager'
@@ -159,7 +160,7 @@ class ConnectionManager:
                     connectors=None,
                     connection_manager=None
             ):
-                self.uuid_ms_task = uuid.uuid4()
+                self.uuid_ms_task = uuid_class.uuid4()
                 self.uuid_element = uuid_element
                 self.uuid_sync_task = uuid_sync_task
                 self.handle = handle
@@ -190,6 +191,9 @@ class ConnectionManager:
 
                 self._connection_manager._task_finished_stack._task_finished_list.remove(self)
 
+            def return_to_queue(self):
+                self._connection_manager._task_stack.return_task_to_queue(self)
+
             def set_executed(self, error=None):
                 if error is None:
                     self._set_success()
@@ -197,20 +201,21 @@ class ConnectionManager:
                     self._set_error(error_code=400, error_description=str(error))
                 self._connection_manager._task_finished_stack._task_finished_list.append(self)
 
-
         def add_task(self, **kwargs):
-            newTaskStructure = self.__getStructure(
-                uuid=str(uuid.uuid4()),
+            new_task_structure = self.__getStructure(
+                uuid=str(uuid_class.uuid4()),
                 authorization=kwargs['authorization'] if 'authorization' in kwargs else None,
                 loader=kwargs['loader'] if 'loader' in kwargs else None,
                 finalizer=kwargs['taskFinalizer'] if 'taskFinalizer' in kwargs else None,
             )
-            self._task_list.append(newTaskStructure)
-            return newTaskStructure['uuid']
+            self._task_list.append(new_task_structure)
+            return new_task_structure['uuid']
 
-        @staticmethod
-        def _setExecutePermissionToTask(task, newStatus):
-            task.execute_permission = newStatus
+        def add_task_in_list(self, task):
+            self._task_list.append(task)
+
+        def return_task_to_queue(self, task):
+            self._task_list.insert(0, task)
 
         def delete_task(self, uuid_task: str = None):
             if uuid_task is not None \
@@ -243,7 +248,7 @@ class ConnectionManager:
                 found = False
                 for curTask in self._task_list:
                     if curTask['uuid'] == uuid_task:
-                        self._setExecutePermissionToTask(curTask, True)
+                        self._set_execute_permission_to_task(curTask, True)
                         found = True
                         break
 
@@ -264,8 +269,9 @@ class ConnectionManager:
             else:
                 return None
 
-        def add_task_in_list(self, task):
-            self._task_list.append(task)
+        @staticmethod
+        def _set_execute_permission_to_task(task, newStatus):
+            task.execute_permission = newStatus
 
     class SessionManagerClass(object):
         __slots__ = '_sessions_list'
@@ -284,21 +290,10 @@ class ConnectionManager:
             }
 
         def get_session_list(self):
-            listOfSessions = []
+            list_of_sessions = []
             for cur_session in self._sessions_list:
-                listOfSessions.append(cur_session.structure)
-                # {
-                #     'uuid': str(cur_session['uuid']),
-                #     'connector': cur_session['connector'],
-                #     'authorization': cur_session['authorization'],
-                #     'usedAccount': False if cur_session['account'] is None else True,
-                #     'active': cur_session['active'],
-                #     'inUse': cur_session['inUse'],
-                #     'ready': cur_session['ready'],
-                #     'live': cur_session['live'],
-                # }
-                # )
-            return listOfSessions
+                list_of_sessions.append(cur_session.structure)
+            return list_of_sessions
 
         def get_session_by_uuid(self, uuid_session: str):
             for cur_session in self._sessions_list:
@@ -318,7 +313,7 @@ class ConnectionManager:
             self.close_disabled_sessions()
             self.delete_disabled_sessions()
 
-        def deleteSessionFromList(self, uuid):
+        def delete_session_from_list(self, uuid):
             for cur_session in self._sessions_list:
                 if cur_session.uuid_session == uuid:
                     if cur_session.active is False \
@@ -359,41 +354,6 @@ class ConnectionManager:
                             session.domain = None
             return True
 
-            # try:
-            #     for cur_session in self._sessions_list:
-            #         if cur_session.uuid_session == uuid_session:
-            #             if cur_session.active is False:
-            #                 if cur_session.in_use is False:
-            #                     if cur_session.squirrel is not None:
-            #                         try:
-            #                             cur_session.squirrel.close()
-            #                             return True
-            #                         except BaseException as e:
-            #                             raise pIC_pMSM.SessionManagement.SqirrelOperation(
-            #                                 'Error on closing session',
-            #                                 level=50,
-            #                                 exception=e
-            #                             )
-            #                         finally:
-            #                             cur_session.squirrel = None
-            #                     elif cur_session.domain is not None:
-            #                         try:
-            #                             cur_session.domain.close()
-            #                             return True
-            #                         except BaseException as e:
-            #                             raise pIC_pMSM.SessionManagement.DomainOperation(
-            #                                 'Error on closing domain',
-            #                                 level=50,
-            #                                 exception=e
-            #                             )
-            #                         finally:
-            #                             cur_session.domain = None
-            #             break
-            # except:
-            #     return True
-            #
-            # return False
-
         def close_disabled_sessions(self):
             for cur_session in self._sessions_list:
                 self.close_disabled_session(cur_session.uuid_session)
@@ -403,11 +363,11 @@ class ConnectionManager:
             Delete all session from list if they not in use
             """
 
-            sessionForDelete = []
+            session_for_delete = []
             for cur_session in self._sessions_list:
-                sessionForDelete.append()
+                session_for_delete.append(cur_session)
 
-            for cur_session_for_delete in sessionForDelete:
+            for cur_session_for_delete in session_for_delete:
                 self._deleteSessionFromList(cur_session_for_delete)
 
         def disable_all_sessions(self):
@@ -425,12 +385,11 @@ class ConnectionManager:
 
             if self.disable_session(session):
                 if self.close_disabled_session(session):
-                    if self.deleteSessionFromList(str(session)):
+                    if self.delete_session_from_list(str(session)):
                         return True
             return False
 
         def add_new_session(self, authorization=None, conn=None, **kwargs):
-            # =================================================================
             new_session = pullgerSquirrel.Session(conn=conn, authorization=authorization)
             self._sessions_list.append(new_session)
 
@@ -440,16 +399,16 @@ class ConnectionManager:
             from pullgerAccountManager.models import Accounts
             from pullgerAccountManager import apiAM
 
-            allAccounts = list(Accounts.objects.getActualList())
+            all_accounts = list(Accounts.objects.getActualList())
 
-            for curAccount in allAccounts:
-                accountUse = False
+            for curAccount in all_accounts:
+                account_use = False
                 for cur_session in self._sessions_list:
                     if cur_session.account == curAccount:
-                        accountUse = True
+                        account_use = True
                         break
 
-                if accountUse is True:
+                if account_use is True:
                     break
 
                 for cur_session in self._sessions_list:
@@ -479,8 +438,8 @@ class ConnectionManager:
                     continue
 
                 if cur_session.active is not True \
-                        and cur_session.in_use is not True \
-                        and cur_session.live is not True:
+                        or cur_session.in_use is True \
+                        or cur_session.live is not True:
                     continue
 
                 self.session_domain_put_in_use_true(cur_session.uuid_session)
@@ -513,6 +472,8 @@ class ConnectionManager:
             session.in_use = False
 
         def execute_operation_on_free_session(self, multy_session_task):
+            result = False
+
             session = self.get_free_session(multy_session_task.authorization, multy_session_task.connectors)
             if session is not None:
                 try:
@@ -534,8 +495,14 @@ class ConnectionManager:
                         level=40,
                         exception=e
                     )
+                else:
+                    result = True
                 finally:
                     self.session_set_available(session=session)
+            else:
+                result = None
+
+            return result
 
     class TaskFinishedStack(object):
         __slots__ = '_task_finished_list'
@@ -546,32 +513,40 @@ class ConnectionManager:
         def __del__(self):
             pass
 
-    def task_execute(self):
+    def task_execute(self, *args, **kwargs):
         return_status = None
         task = self._task_stack.get_next_task()
         try:
             if task is not None:
-                self.sessionManager.execute_operation_on_free_session(task)
-                task.set_executed()
-                return_status = True
+                result_execution = self.sessionManager.execute_operation_on_free_session(task)
+                if result_execution is True:
+                    task.set_executed()
+                    return_status = True
+                    print(f"TASK {str(task.uuid_ms_task)}: successfully executed.")
+                elif result_execution is None:
+                    task.return_to_queue()
+                    print(f"TASK {str(task.uuid_ms_task)}: not executed. (no task to execute)")
+            else:
+                print(f"No TASK found in queue.")
         except BaseException as e:
             task.set_executed(error=e)
             return_status = False
+            print(f"Error on executed TASK: {str(task.uuid)}. Description: {str(e)}")
         return return_status
 
     def tasks_finalize(self):
         is_end = False
-        indexList = 0
+        index_list = 0
         while is_end is False:
-            if len(self._task_finished_stack._task_finished_list) - 1 >= indexList:
-                cur_finalize_task = self._task_finished_stack._task_finished_list[indexList]
+            if len(self._task_finished_stack._task_finished_list) - 1 >= index_list:
+                cur_finalize_task = self._task_finished_stack._task_finished_list[index_list]
                 try:
                     try:
                         cur_finalize_task.finalize()
                     except BaseException as e:
                         raise pIC_pMSM.TaskFinalization.General('Error on finalisation', level=50, exeptation=e)
                 except:
-                    indexList += 1
+                    index_list += 1
             else:
                 is_end = True
 
