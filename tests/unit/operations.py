@@ -1,33 +1,10 @@
 from django.test import TestCase
 from django.apps import apps
-from pullgerMultiSessionManager import api, core
-from . import UnitOperations
+from pullgerMultiSessionManager import apiMSM, core
+from ..tools import UnitOperations
 
-class Test_000_00_00_API(TestCase):
-    def test_001_00_00_SessionManager_smoke(self):
-        def create_and_kill_standard_sessions():
-            session_uuid = UnitOperations.add_new_session_general_no_head()
 
-            resultKillSession = api.kill_session(uuid=session_uuid)
-            self.assertEqual(resultKillSession, None, 'Error on killing empy session')
-
-        def create_and_kill_authorization_linkedin_sessions():
-            uuid_session = UnitOperations.add_new_linkedin_session()
-            UnitOperations.kill_session(uuid_session)
-
-        create_and_kill_standard_sessions()
-        create_and_kill_authorization_linkedin_sessions()
-
-    def test_000_00_00_SessionManager_getSessionList(self):
-        testUUID = []
-        testUUID.append(api.add_new_session())
-        testUUID.append(api.add_new_session())
-        sessionList = api.get_sessions_list()
-
-        for index in range(0, 2):
-            self.assertEqual(sessionList[index]['uuid'] , testUUID[index])
-
-class Test_001_00_00_Operation(TestCase):
+class Test001Operation(TestCase):
     def test_001_00_00_initiation(self):
         '''
             Testing mechenisme initialisation
