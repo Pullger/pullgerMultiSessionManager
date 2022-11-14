@@ -1,5 +1,11 @@
 Version history [pullgerMultiSessionManager]
 
+{0.3.2.1} [pullgerMultiSessionManager]
+ - fix error on finalization
+
+{0.3.2.0} [pullgerMultiSessionManager]
+ - switching to pullgerDataSynchronization module
+
 {0.3.1.0} [pullgerMultiSessionManager]
  - clear sent and not executed task
  - set one rune module on start project

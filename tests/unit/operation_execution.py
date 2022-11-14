@@ -1,6 +1,6 @@
 from django.test import TestCase
 from pullgerMultiSessionManager import apiMSM
-from pullgerMultiSessionManager.tests.tools import UnitOperations
+from pullgerMultiSessionManager.tests.tools import unitOperationsMSM
 import time
 
 
@@ -13,7 +13,7 @@ class Unit001OperationExecution(TestCase):
 
         for i in range(1):
             if i == 0:
-                uuid_session = UnitOperations.add_new_session_selenium_stand_alone(self)
+                uuid_session = unitOperationsMSM.add_new_session_selenium_stand_alone(self)
             # elif i == 1:
             #     uuid_session = UnitOperations.add_new_session_selenium_headless(self)
             # elif i == 2:
@@ -32,4 +32,4 @@ class Unit001OperationExecution(TestCase):
 
             time.sleep(10)
 
-            UnitOperations.kill_session(self, uuid_session=uuid_session)
+            unitOperationsMSM.kill_session(self, uuid_session=uuid_session)

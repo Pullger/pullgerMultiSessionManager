@@ -18,11 +18,11 @@ def add_new_linkedin_session(self: TestCase):
         self.assertIsInstance(new_session, Session, "Incorrect return on create new session.")
         return new_session
 
-def add_new_session_selenium_standard(self):
-    session_uuid = apiMSM.add_new_session(conn=connector.chrome.standard)
-    self.assertNotEqual(session_uuid, None, 'Error on creating new session')
 
-    return session_uuid
+def add_new_session_selenium_standard(self):
+    session = apiMSM.add_new_session(conn=connector.chrome.standard)
+    self.assertNotEqual(session, None, 'Error on creating new session')
+    return session
 
 
 def add_new_session_selenium_headless(self):

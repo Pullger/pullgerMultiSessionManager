@@ -26,7 +26,7 @@ def execute_task_in_the_queue(*args, **kwargs):
 
 def execute_finalizer(*args, **kwargs):
     msm_app = apps.get_app_config('pullgerMultiSessionManager')
-    msm_app.multi_session_manager.tasks_finalize()
+    return msm_app.multi_session_manager.tasks_finalize()
 
 
 def add_new_session(authorization=None, conn=None, **kwargs):

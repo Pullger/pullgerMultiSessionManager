@@ -1,6 +1,6 @@
 from django.test import TestCase
 from pullgerMultiSessionManager import apiMSM
-from pullgerMultiSessionManager.tests.tools import UnitOperations
+from pullgerMultiSessionManager.tests.tools import unitOperationsMSM
 
 
 class Unit001OperationElements(TestCase):
@@ -8,9 +8,9 @@ class Unit001OperationElements(TestCase):
 
         for i in range(2):
             if i == 0:
-                uuid_session = UnitOperations.add_new_session_selenium_standard(self)
+                uuid_session = unitOperationsMSM.add_new_session_selenium_standard(self)
             elif i == 1:
-                uuid_session = UnitOperations.add_new_session_selenium_headless(self)
+                uuid_session = unitOperationsMSM.add_new_session_selenium_headless(self)
 
             api.operation_get_page(uuid_session=uuid_session, url="https://google.com")
 
@@ -36,4 +36,4 @@ class Unit001OperationElements(TestCase):
             find_mark = current_url.find("google.com/search?")
             self.assertNotEqual(find_mark, -1, "Incorrect search operation.")
 
-            UnitOperations.kill_session(self, uuid_session=uuid_session)
+            unitOperationsMSM.kill_session(self, uuid_session=uuid_session)

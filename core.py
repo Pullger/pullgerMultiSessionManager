@@ -4,20 +4,9 @@ import importlib
 import pullgerSquirrel
 from pullgerInternalControl import pIC_pMSM
 from pullgerInternalControl import pIC_pD
+from pullgerInternalControl import pIC_pS
 
-
-def get_model_class_by_name(full_path):
-    path_list = full_path.split('.')
-    module_library = importlib.import_module('.'.join(path_list[:-1]))
-    return getattr(module_library, path_list[-1])
-
-    # import importlib
-    # task_forProcessing.model.split('.')
-
-    # path_list = task_forProcessing.model.split('.')
-    # mm = importlib.import_module(task_forProcessing.model)
-    # mm = importlib.import_module('.'.join(path_list[:-1]))
-    # pass
+from pullgerDataSynchronization import commonDS
 
 
 def get_function_by_name(model_class, name):
@@ -40,7 +29,7 @@ class ConnectionManager:
         self._task_finished_stack = self.TaskFinishedStack()
         self.sessionManager = self.SessionManagerClass()
         self.operationExecutor = self.OperationExecutorClass(connection_manager=self)
-        from pullgerReflection.com_linkedin__TT import models
+        from pullgerDataSynchronization import models
         models.ExecutionStackLinks.objects.initialization_clear()
 
     class OperationExecutorClass:
@@ -181,9 +170,9 @@ class ConnectionManager:
                 self.status_description = error_description
 
             def finalize(self):
-                from pullgerReflection.com_linkedin__TT.models import ExecutionStackLinks as SyncRegistrar
+                from pullgerDataSynchronization.models import ExecutionStackLinks
 
-                SyncRegistrar.finalize(
+                ExecutionStackLinks.finalize(
                     uuid=self.uuid_sync_task,
                     status_code=self.status_code,
                     status_description=self.status_description
@@ -194,11 +183,11 @@ class ConnectionManager:
             def return_to_queue(self):
                 self._connection_manager._task_stack.return_task_to_queue(self)
 
-            def set_executed(self, error=None):
+            def set_executed(self, error=None, error_code=500):
                 if error is None:
                     self._set_success()
                 else:
-                    self._set_error(error_code=400, error_description=str(error))
+                    self._set_error(error_code=error_code, error_description=str(error))
                 self._connection_manager._task_finished_stack._task_finished_list.append(self)
 
         def add_task(self, **kwargs):
@@ -477,8 +466,8 @@ class ConnectionManager:
             session = self.get_free_session(multy_session_task.authorization, multy_session_task.connectors)
             if session is not None:
                 try:
-                    model_class = get_model_class_by_name(multy_session_task.model)
-                    synced_elem = model_class.objects.get_by_uuid(uuid_element=multy_session_task.uuid_element)
+                    model_class = commonDS.get_model_class_by_name(multy_session_task.model)
+                    synced_elem = model_class.objects.get_by_uuid(uuid=multy_session_task.uuid_element)
 
                     executor = get_function_by_name(synced_elem, multy_session_task.handle)
                     executor(session=session)
@@ -491,7 +480,7 @@ class ConnectionManager:
                     )
                 except BaseException as e:
                     raise pIC_pMSM.SessionManagement.Execute(
-                        msg=f"Error on executing task",
+                        msg=f"Error on executing task: [{str(e)}]",
                         level=40,
                         exception=e
                     )
@@ -528,30 +517,46 @@ class ConnectionManager:
                     print(f"TASK {str(task.uuid_ms_task)}: not executed. (no task to execute)")
             else:
                 print(f"No TASK found in queue.")
-        except BaseException as e:
-            task.set_executed(error=e)
+        except pIC_pS.ErrorOnLoadPage as e:
+            task.set_executed(error_code=400, error=e)
             return_status = False
-            print(f"Error on executed TASK: {str(task.uuid)}. Description: {str(e)}")
+            print(f"Error on executed TASK: {str(task.uuid_ms_task)}. Description: {str(e)}")
+        except BaseException as e:
+            task.set_executed(error_code=500, error=e)
+            return_status = False
+            print(f"Error on executed TASK: {str(task.uuid_ms_task)}. Description: {str(e)}")
         return return_status
 
     def tasks_finalize(self):
         is_end = False
         index_list = 0
+        finalized = 0
+        finalization_errors = 0
+        amount = len(self._task_finished_stack._task_finished_list)
         while is_end is False:
             if len(self._task_finished_stack._task_finished_list) - 1 >= index_list:
                 cur_finalize_task = self._task_finished_stack._task_finished_list[index_list]
                 try:
                     try:
                         cur_finalize_task.finalize()
+                        finalized += 1
                     except BaseException as e:
                         raise pIC_pMSM.TaskFinalization.General('Error on finalisation', level=50, exeptation=e)
+                        finalization_errors += 1
                 except:
                     index_list += 1
             else:
                 is_end = True
+        respond = {
+            "amount": amount,
+            "finalized": finalized,
+            "finalization_errors": finalization_errors
+        }
 
-    def add_sync_task(self, task_for_processing, **kwargs):
-        model_class = get_model_class_by_name(task_for_processing.model)
+        return respond
+
+    def add_sync_task(self, task_for_processing, *args, **kwargs):
+        model_class = commonDS.get_model_class_by_name(task_for_processing.model)
 
         new_multy_session_task = self._task_stack.MultiSessionTask(
             uuid_sync_task=task_for_processing.uuid,
